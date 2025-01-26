@@ -11,7 +11,7 @@
    </style>
 </head>
 <body>
-   <h1>Household Income Over Time (y_HH)</h1>
+   <h1>Household Income Over Time</h1>
    <select id="regionSelect"></select>
    <div class="container">
        <canvas id="chart"></canvas>
@@ -42,7 +42,32 @@
                    options: {
                        responsive: true,
                        interaction: {
+                           intersect: false,
                            mode: 'index'
+                       },
+                       plugins: {
+                           tooltip: {
+                               backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                               titleColor: '#000',
+                               bodyColor: '#000',
+                               borderColor: '#ddd',
+                               borderWidth: 1,
+                               padding: 10,
+                               displayColors: false,
+                               callbacks: {
+                                   label: function(context) {
+                                       return `Income: ${context.parsed.y.toFixed(2)} PEN`;
+                                   }
+                               }
+                           }
+                       },
+                       scales: {
+                           y: {
+                               title: {
+                                   display: true,
+                                   text: 'Monthly PEN p/c'
+                               }
+                           }
                        }
                    }
                });
