@@ -1,92 +1,109 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Peru Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0"></script>
-    <style>
-        body { background: #f5f5f5; padding: 20px; }
-        #chart { background: white; border-radius: 4px; padding: 20px; }
-    </style>
+   <title>Peru Dashboard</title>
+   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0"></script>
+   <style>
+       body { background: #f5f5f5; padding: 20px; }
+       #chart { background: white; border-radius: 4px; padding: 20px; }
+   </style>
 </head>
 <body>
-    <select id="regionSelect" style="margin-bottom: 20px; padding: 5px;"></select>
-    <canvas id="chart"></canvas>
-    <script>
-        let chart;
-        fetch('input.csv')
-            .then(response => response.text())
-            .then(csvText => {
-                const data = Papa.parse(csvText, {
-                    header: true,
-                    dynamicTyping: true
-                }).data;
-                createVisualization(data);
-            });
+   <select id="regionSelect" style="margin-bottom: 20px; padding: 5px;"></select>
+   <canvas id="chart"></canvas>
+   <script>
+       let chart;
+       fetch('input.csv')
+           .then(response => response.text())
+           .then(csvText => {
+               const data = Papa.parse(csvText, {
+                   header: true,
+                   dynamicTyping: true
+               }).data;
+               createVisualization(data);
+           });
 
-        function createVisualization(data) {
-            const regions = [...new Set(data.map(d => d.department))];
-            const select = document.getElementById('regionSelect');
-            regions.forEach(region => {
-                const option = document.createElement('option');
-                option.value = region;
-                option.text = region;
-                select.appendChild(option);
-            });
+       function createVisualization(data) {
+           const regions = [...new Set(data.map(d => d.department))];
+           const select = document.getElementById('regionSelect');
+           regions.forEach(region => {
+               const option = document.createElement('option');
+               option.value = region;
+               option.text = region;
+               select.appendChild(option);
+           });
 
-            const ctx = document.getElementById('chart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                options: {
-                    animation: false,
-                    responsive: true,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    },
-                    plugins: {
-                        legend: {
-                            labels: {
-                                usePointStyle: true,
-                                pointStyle: 'circle'
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                color: '#e5e5e5'
-                            }
-                        },
-                        y: {
-                            grid: {
-                                color: '#e5e5e5'
-                            }
-                        }
-                    }
-                }
-            });
+           const ctx = document.getElementById('chart').getContext('2d');
+           chart = new Chart(ctx, {
+               type: 'line',
+               options: {
+                   animation: false,
+                   responsive: true,
+                   interaction: {
+                       intersect: false,
+                       mode: 'index'
+                   },
+                   plugins: {
+                       tooltip: {
+                           backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                           titleColor: '#000',
+                           bodyColor: '#000',
+                           borderColor: '#ddd',
+                           borderWidth: 1,
+                           padding: 10,
+                           displayColors: false,
+                           callbacks: {
+                               label: function(context) {
+                                   return `Value: ${context.parsed.y.toFixed(2)}`;
+                               },
+                               title: function(context) {
+                                   return `Year: ${context[0].label}`;
+                               }
+                           }
+                       },
+                       legend: {
+                           labels: {
+                               usePointStyle: true,
+                               pointStyle: 'circle'
+                           }
+                       }
+                   },
+                   scales: {
+                       x: {
+                           grid: {
+                               color: '#e5e5e5'
+                           }
+                       },
+                       y: {
+                           grid: {
+                               color: '#e5e5e5'
+                           }
+                       }
+                   }
+               }
+           });
 
-            function updateChart(region) {
-                const filteredData = data.filter(d => d.department == region);
-                chart.data = {
-                    labels: filteredData.map(d => d.year),
-                    datasets: [{
-                        label: 'Region ' + region,
-                        data: filteredData.map(d => d.y_HH),
-                        borderColor: '#4e79a7',
-                        backgroundColor: '#4e79a7',
-                        pointRadius: 3,
-                        pointHoverRadius: 7,
-                        pointBackgroundColor: '#4e79a7'
-                    }]
-                };
-                chart.update('none');
-            }
+           function updateChart(region) {
+               const filteredData = data.filter(d => d.department == region);
+               chart.data = {
+                   labels: filteredData.map(d => d.year),
+                   datasets: [{
+                       label: 'Region ' + region,
+                       data: filteredData.map(d => d.y_HH),
+                       borderColor: '#4e79a7',
+                       backgroundColor: '#4e79a7',
+                       pointRadius: 3,
+                       pointHoverRadius: 7,
+                       pointBackgroundColor: '#4e79a7'
+                   }]
+               };
+               chart.update('none');
+           }
 
-            select.onchange = (e) => updateChart(e.target.value);
-            updateChart(regions[0]);
-        }
-    </script>
+           select.onchange = (e) => updateChart(e.target.value);
+           updateChart(regions[0]);
+       }
+   </script>
 </body>
 </html>
