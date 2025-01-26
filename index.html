@@ -31,8 +31,8 @@
 
        // Load data and initialize visualizations
        Promise.all([
-           fetch('input.csv').then(r => r.text()),
-           fetch('peru_regions.geojson').then(r => r.json())
+           fetch('/pilot2025-datasharing/input.csv').then(r => r.text()),
+           fetch('/pilot2025-datasharing/peru_regions.geojson').then(r => r.json())
        ]).then(([csvText, geojson]) => {
            const data = Papa.parse(csvText, {
                header: true,
