@@ -1,111 +1,135 @@
 <!DOCTYPE html>
 <html>
 <head>
-   <title>Peru Time Series</title>
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-   <style>
-       body { padding: 20px; }
-       .container { width: 80%; margin: 0 auto; }
-       h1 { text-align: center; font-size: 2.5em; margin-bottom: 30px; color: #333; }
-       select { padding: 5px; margin-bottom: 20px; }
-   </style>
+  <title>Peru Dashboard</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- PapaParse -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0"></script>
+  <!-- Leaflet (no base map, just the library) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <style>
+    body { background: #f5f5f5; margin: 0; padding: 20px; font-family: sans-serif; }
+    select { margin-bottom: 10px; padding: 5px; }
+    .container { display: flex; gap: 20px; }
+    #map {
+      width: 40%;
+      height: 500px;
+      background: #fff; /* You can pick any color, this is your "blank" background. */
+      border-radius: 4px;
+    }
+    #chartContainer {
+      width: 60%;
+      background: #fff;
+      border-radius: 4px;
+      padding: 20px;
+    }
+  </style>
 </head>
 <body>
-   <h1>Household Income Over Time</h1>
-   <select id="regionSelect"></select>
-   <div class="container">
-       <canvas id="chart"></canvas>
-   </div>
-   <script>
-       let chart;
+  <select id="regionSelect"></select>
+  <div class="container">
+    <div id="map"></div>
+    <div id="chartContainer">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let chart;
+    let geojsonLayer;
+
+    // 1) Initialize the Leaflet map with normal interactions (panning, zoom)
+    let map = L.map('map', {
+      zoomControl: true,   // allow zoom controls
+      dragging: true,      // allow dragging
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      touchZoom: true
+    }).setView([-9.189967, -75.015152], 5);
+
+    // 2) Load data: input.csv (time series) & peru_regions.geojson (GeoJSON shapes)
+    Promise.all([
+      fetch('input.csv').then(r => r.text()),
+      fetch('peru_regions.geojson').then(r => r.json())
+    ]).then(([csvText, geojsonData]) => {
+      // Parse CSV
+      const data = Papa.parse(csvText, {
+        header: true,
+        dynamicTyping: true
+      }).data;
+
+      // Add the GeoJSON layer (blank background, only shapes)
+      geojsonLayer = L.geoJSON(geojsonData, {
+        style: {
+          fillColor: '#cccccc',
+          color: '#999', 
+          weight: 1
+        }
+      }).addTo(map);
+
+      // Adjust map bounds to fit all shapes
+      map.fitBounds(geojsonLayer.getBounds());
+
+      createVisualization(data);
+    });
+
+    function createVisualization(data) {
+      // 3) Build region dropdown from CSV
+      const regions = [...new Set(data.map(d => d.department))];
+      const select = document.getElementById('regionSelect');
+      regions.forEach(region => {
+        const option = document.createElement('option');
+        option.value = region;
+        option.text = region;
+        select.appendChild(option);
+      });
+
+      // 4) Setup Chart.js
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        options: {
+          animation: false,
+          responsive: true,
+          interaction: { intersect: false, mode: 'index' }
+        }
+      });
+
+      select.onchange = e => updateAll(e.target.value);
+      updateAll(regions[0]); // initial selection
        
-       fetch('input.csv')
-           .then(r => r.text())
-           .then(csvText => {
-               const data = Papa.parse(csvText, {
-                   header: true,
-                   dynamicTyping: true,
-                   skipEmptyLines: true
-               }).data;
+      function updateAll(region) {
+        // Filter CSV data by region
+        const filtered = data.filter(d => d.department == region);
 
-               console.log('Data sample:', data.slice(0, 5)); // Debug log
+        // Update chart data
+        chart.data = {
+          labels: filtered.map(d => d.year),
+          datasets: [{
+            label: `Region ${region}`,
+            data: filtered.map(d => d.y_HH),
+            borderColor: '#4e79a7',
+            backgroundColor: '#4e79a7',
+            pointRadius: 3,
+            pointHoverRadius: 7
+          }]
+        };
+        chart.update('none');
 
-               const regions = [...new Set(data
-                   .filter(d => d && d.department && d.year && d.y_HH)
-                   .map(d => d.department))]
-                   .sort();
-
-               console.log('Available regions:', regions); // Debug log
-
-               const select = document.getElementById('regionSelect');
-               regions.forEach(region => {
-                   const option = document.createElement('option');
-                   option.value = region;
-                   option.text = region;
-                   select.appendChild(option);
-               });
-
-               const ctx = document.getElementById('chart');
-               chart = new Chart(ctx, {
-                   type: 'line',
-                   options: {
-                       responsive: true,
-                       interaction: {
-                           intersect: false,
-                           mode: 'index'
-                       },
-                       plugins: {
-                           tooltip: {
-                               backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                               titleColor: '#000',
-                               bodyColor: '#000',
-                               borderColor: '#ddd',
-                               borderWidth: 1,
-                               padding: 10,
-                               displayColors: false,
-                               callbacks: {
-                                   label: function(context) {
-                                       return `Income: ${context.parsed.y.toFixed(2)} PEN`;
-                                   }
-                               }
-                           }
-                       },
-                       scales: {
-                           y: {
-                               title: {
-                                   display: true,
-                                   text: 'Monthly PEN p/c'
-                               }
-                           }
-                       }
-                   }
-               });
-
-               function updateChart(region) {
-                   const filteredData = data
-                       .filter(d => d && d.department === region && d.year && d.y_HH)
-                       .sort((a, b) => a.year - b.year);
-
-                   console.log('Filtered data for', region, ':', filteredData); // Debug log
-
-                   chart.data = {
-                       labels: filteredData.map(d => d.year),
-                       datasets: [{
-                           label: region,
-                           data: filteredData.map(d => d.y_HH),
-                           borderColor: '#4e79a7'
-                       }]
-                   };
-                   chart.update();
-               }
-
-               select.onchange = (e) => updateChart(e.target.value);
-               if (regions.length > 0) {
-                   updateChart(regions[0]);
-               }
-           })
-           .catch(error => console.error('Error loading data:', error));
-   </script>
+        // Update GeoJSON styling to highlight selected region
+        // Assume your geojson has "region_id" or similar property matching CSV "department"
+        geojsonLayer.setStyle(feature => {
+          return {
+            fillColor: (feature.properties.region_id == region) ? '#4e79a7' : '#cccccc',
+            color: '#999', 
+            weight: 1
+          };
+        });
+      }
+    }
+  </script>
 </body>
 </html>
