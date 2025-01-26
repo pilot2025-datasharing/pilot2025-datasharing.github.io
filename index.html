@@ -8,6 +8,7 @@
        body { padding: 20px; }
        .container { width: 80%; margin: 0 auto; }
        h1 { text-align: center; font-size: 2.5em; margin-bottom: 30px; color: #333; }
+       select { padding: 5px; margin-bottom: 20px; }
    </style>
 </head>
 <body>
@@ -24,10 +25,19 @@
            .then(csvText => {
                const data = Papa.parse(csvText, {
                    header: true,
-                   dynamicTyping: true
+                   dynamicTyping: true,
+                   skipEmptyLines: true
                }).data;
 
-               const regions = [...new Set(data.map(d => d.department))];
+               console.log('Data sample:', data.slice(0, 5)); // Debug log
+
+               const regions = [...new Set(data
+                   .filter(d => d && d.department && d.year && d.y_HH)
+                   .map(d => d.department))]
+                   .sort();
+
+               console.log('Available regions:', regions); // Debug log
+
                const select = document.getElementById('regionSelect');
                regions.forEach(region => {
                    const option = document.createElement('option');
@@ -73,7 +83,12 @@
                });
 
                function updateChart(region) {
-                   const filteredData = data.filter(d => d.department === region);
+                   const filteredData = data
+                       .filter(d => d && d.department === region && d.year && d.y_HH)
+                       .sort((a, b) => a.year - b.year);
+
+                   console.log('Filtered data for', region, ':', filteredData); // Debug log
+
                    chart.data = {
                        labels: filteredData.map(d => d.year),
                        datasets: [{
@@ -86,8 +101,11 @@
                }
 
                select.onchange = (e) => updateChart(e.target.value);
-               updateChart(regions[0]);
-           });
+               if (regions.length > 0) {
+                   updateChart(regions[0]);
+               }
+           })
+           .catch(error => console.error('Error loading data:', error));
    </script>
 </body>
 </html>
