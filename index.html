@@ -64,6 +64,7 @@
   <script>
     let chart;         // Chart.js instance
     let geojsonLayer;  // Leaflet GeoJSON layer
+    let selectedRegionId = null; // Track the currently selected region
 
     // 1) Initialize Leaflet map with normal panning/zooming
     let map = L.map('map').setView([-9.189967, -75.015152], 5);
@@ -92,15 +93,23 @@
           // Add hover effects
           layer.on({
             mouseover: () => {
-              layer.setStyle({
-                fillColor: '#4e79a7', // Highlight color
-                color: '#333',        // Highlight border color
-                weight: 2             // Highlight border weight
-              });
+              if (feature.properties.region_id !== selectedRegionId) {
+                layer.setStyle({
+                  fillColor: '#4e79a7', // Highlight color
+                  color: '#333',        // Highlight border color
+                  weight: 2             // Highlight border weight
+                });
+              }
             },
             mouseout: () => {
-              // Reset to default style
-              geojsonLayer.resetStyle(layer);
+              if (feature.properties.region_id !== selectedRegionId) {
+                // Reset to default style if not the selected region
+                layer.setStyle({
+                  fillColor: '#ccc',
+                  color: '#999',
+                  weight: 1
+                });
+              }
             }
           });
         }
@@ -182,8 +191,9 @@
         chart.update('none');
 
         // Highlight the selected region on the map
+        selectedRegionId = selectedRegion; // Update the selected region ID
         geojsonLayer.eachLayer(layer => {
-          if (layer.feature.properties.region_id === selectedRegion) {
+          if (layer.feature.properties.region_id === selectedRegionId) {
             layer.setStyle({
               fillColor: '#4e79a7', // Highlight color
               color: '#333',        // Highlight border color
@@ -191,7 +201,11 @@
             });
           } else {
             // Reset other regions to default style
-            geojsonLayer.resetStyle(layer);
+            layer.setStyle({
+              fillColor: '#ccc',
+              color: '#999',
+              weight: 1
+            });
           }
         });
       }
