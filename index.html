@@ -1,97 +1,172 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Time Series Debug</title>
-  <!-- Chart.js from CDN -->
+  <title>Peru Dashboard</title>
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- PapaParse from CDN -->
+  <!-- PapaParse -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0"></script>
+  <!-- Leaflet (no base map) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
   <style>
-    body { background: #f5f5f5; margin: 0; padding: 20px; font-family: sans-serif; }
-    #status { margin-bottom: 10px; font-weight: bold; }
-    #chartContainer { background: #fff; border-radius: 4px; padding: 20px; max-width: 900px; margin: auto; }
-    canvas { width: 100%; max-height: 400px; }
+    body {
+      background: #f5f5f5; 
+      margin: 0; 
+      padding: 20px; 
+      font-family: sans-serif;
+    }
+    select {
+      margin-bottom: 10px; 
+      padding: 5px;
+    }
+    .container {
+      display: flex;
+      gap: 20px;
+    }
+    #map {
+      width: 40%;
+      height: 500px;
+      background: #fff; /* blank background for no base tiles */
+      border-radius: 4px;
+    }
+    #chartContainer {
+      width: 60%;
+      background: #fff;
+      border-radius: 4px;
+      padding: 20px;
+    }
   </style>
 </head>
 <body>
-  <div id="status">Loading...</div>
-  <div id="chartContainer">
-    <canvas id="myChart"></canvas>
+  <!-- Region Dropdown -->
+  <select id="regionSelect"></select>
+
+  <div class="container">
+    <!-- Leaflet Map (no base tiles, just GeoJSON) -->
+    <div id="map"></div>
+    <!-- Chart.js Container -->
+    <div id="chartContainer">
+      <canvas id="chart"></canvas>
+    </div>
   </div>
 
   <script>
-    // 1) Attempt to load input.csv
-    fetch('input.csv')
-      .then(resp => {
-        if (!resp.ok) throw new Error(`Failed to fetch input.csv (HTTP ${resp.status}). Possibly a 404 or path error.`);
-        return resp.text();
-      })
-      .then(csvText => {
-        // 2) Parse with Papa
-        const parsed = Papa.parse(csvText, {
-          header: true,
-          dynamicTyping: true
-        });
-        if (parsed.errors.length > 0) {
-          console.error('PapaParse Errors:', parsed.errors);
-          document.getElementById('status').textContent = 'CSV parse error, check console.';
-          return;
-        }
-        // All rows
-        const data = parsed.data;
-        console.log('Entire CSV data:', data);
-        document.getElementById('status').textContent = 'CSV loaded successfully.';
+    let chart;         // Chart.js instance
+    let geojsonLayer;  // Leaflet GeoJSON layer
 
-        // 3) Create chart
-        createTimeSeries(data);
-      })
-      .catch(err => {
-        console.error('Fetch or parse error:', err);
-        document.getElementById('status').textContent = 'Error: ' + err.message;
+    // 1) Initialize Leaflet map with normal panning/zooming
+    let map = L.map('map').setView([-9.189967, -75.015152], 5);
+
+    // 2) Load CSV (input.csv) & GeoJSON (peru_regions.geojson)
+    Promise.all([
+      fetch('input.csv').then(r => r.text()),
+      fetch('peru_regions.geojson').then(r => r.json())
+    ]).then(([csvText, geojsonData]) => {
+      // Parse CSV with Papa
+      const data = Papa.parse(csvText, {
+        header: true,
+        dynamicTyping: true
+      }).data;
+
+      console.log(data); // Debug: Inspect parsed data
+
+      // Create a GeoJSON layer
+      geojsonLayer = L.geoJSON(geojsonData, {
+        style: {
+          fillColor: '#ccc',
+          color: '#999',
+          weight: 1
+        }
+      }).addTo(map);
+
+      // Fit map to the bounds of the GeoJSON shapes
+      map.fitBounds(geojsonLayer.getBounds());
+
+      // Build chart & dropdown logic
+      createVisualization(data);
+    });
+
+    function createVisualization(data) {
+      // 3) Build region dropdown from unique numeric department IDs
+      const regionIds = [...new Set(data.map(d => d.department))];
+      const select = document.getElementById('regionSelect');
+      regionIds.forEach(region => {
+        const option = document.createElement('option');
+        option.value = region;
+        option.text = `Region ${region}`;
+        select.appendChild(option);
       });
 
-    function createTimeSeries(allRows) {
-      // 4) Filter for a region. If your CSV has "department=1" rows, do:
-      const selectedRegion = 1; // or pick any region you know should exist
-      const filtered = allRows.filter(row => row.department === selectedRegion);
-      console.log(`Filtering for department=${selectedRegion}, found ${filtered.length} rows.`, filtered);
-
-      let labels, values;
-      if (filtered.length > 0) {
-        labels = filtered.map(r => r.year);
-        values = filtered.map(r => r.y_HH);
-        document.getElementById('status').textContent += ` Showing region ${selectedRegion} with ${filtered.length} rows.`;
-      } else {
-        // fallback demo
-        console.warn('No matching data found, using fallback sample data.');
-        document.getElementById('status').textContent += ' No matching data, using fallback.';
-        labels = [1997, 1998, 1999, 2000];
-        values = [50, 100, 150, 200];
-      }
-
-      const ctx = document.getElementById('myChart').getContext('2d');
-      new Chart(ctx, {
+      // 4) Initialize Chart.js
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, {
         type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Ingresos del Hogar Mensuales p/c (PEN)',
-            data: values,
-            borderColor: '#4e79a7',
-            backgroundColor: '#4e79a7',
-            pointRadius: 4,
-            pointHoverRadius: 7
-          }]
-        },
+        data: { labels: [], datasets: [] },
         options: {
+          animation: false,
           responsive: true,
-          interaction: { intersect: false, mode: 'index' },
+          interaction: {
+            intersect: false,
+            mode: 'index'
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: 'Ingresos del Hogar Mensuales p/c (PEN)'
+            }
+          },
           scales: {
-            x: { display: true },
-            y: { display: true }
+            x: {
+              display: true
+            },
+            y: {
+              display: true
+            }
           }
         }
       });
+
+      // Update chart & highlight map when dropdown changes
+      select.onchange = e => updateAll(Number(e.target.value));
+      // Initialize with the first region
+      updateAll(regionIds[0]);
+
+      // Called whenever region changes
+      function updateAll(selectedRegion) {
+        // Filter CSV by that region
+        const filtered = data.filter(d => d.department === selectedRegion);
+
+        // Update chart data
+        chart.data.labels = filtered.map(d => d.year.toString()); // Ensure labels are strings
+        chart.data.datasets = [{
+          label: `Region ${selectedRegion}`,
+          data: filtered.map(d => d.y_HH),
+          borderColor: '#4e79a7',
+          backgroundColor: '#4e79a7',
+          pointRadius: 3,
+          pointHoverRadius: 7
+        }];
+        chart.update('none');
+
+        // Update GeoJSON to highlight the selected region
+        geojsonLayer.setStyle(feature => {
+          if (feature.properties.region_id === selectedRegion) {
+            return {
+              fillColor: '#4e79a7',
+              color: '#333',
+              weight: 1
+            };
+          } else {
+            return {
+              fillColor: '#ccc',
+              color: '#999',
+              weight: 1
+            };
+          }
+        });
+      }
     }
   </script>
 </body>
