@@ -1,86 +1,70 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Time Series Debug Example</title>
-  <!-- Chart.js -->
+  <title>Time Series Debug</title>
+  <!-- Chart.js from CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- PapaParse -->
+  <!-- PapaParse from CDN -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0"></script>
   <style>
-    body {
-      background: #f5f5f5;
-      margin: 0; padding: 20px;
-      font-family: sans-serif;
-    }
-    #chartContainer {
-      background: #fff;
-      border-radius: 4px;
-      padding: 20px;
-      max-width: 800px;
-      margin: auto;
-    }
-    canvas {
-      width: 100%; 
-      max-height: 400px;
-    }
-    #status {
-      margin: 10px 0;
-      color: #555;
-    }
+    body { background: #f5f5f5; margin: 0; padding: 20px; font-family: sans-serif; }
+    #status { margin-bottom: 10px; font-weight: bold; }
+    #chartContainer { background: #fff; border-radius: 4px; padding: 20px; max-width: 900px; margin: auto; }
+    canvas { width: 100%; max-height: 400px; }
   </style>
 </head>
 <body>
-  <div id="status">Loading data...</div>
+  <div id="status">Loading...</div>
   <div id="chartContainer">
     <canvas id="myChart"></canvas>
   </div>
 
   <script>
-    // 1) Fetch & parse input.csv
+    // 1) Attempt to load input.csv
     fetch('input.csv')
-      .then(response => {
-        if (!response.ok) throw new Error(`CSV not found (HTTP ${response.status})`);
-        return response.text();
+      .then(resp => {
+        if (!resp.ok) throw new Error(`Failed to fetch input.csv (HTTP ${resp.status}). Possibly a 404 or path error.`);
+        return resp.text();
       })
       .then(csvText => {
+        // 2) Parse with Papa
         const parsed = Papa.parse(csvText, {
           header: true,
-          dynamicTyping: true // so 'year' or 'department' can become numbers if they're numeric
+          dynamicTyping: true
         });
-        // Check if there's parse error
         if (parsed.errors.length > 0) {
-          console.error('PapaParse errors:', parsed.errors);
-          document.getElementById('status').textContent = 'CSV parse error. Check console.';
+          console.error('PapaParse Errors:', parsed.errors);
+          document.getElementById('status').textContent = 'CSV parse error, check console.';
           return;
         }
-        
+        // All rows
         const data = parsed.data;
         console.log('Entire CSV data:', data);
+        document.getElementById('status').textContent = 'CSV loaded successfully.';
+
+        // 3) Create chart
         createTimeSeries(data);
       })
       .catch(err => {
-        console.error('Fetch/Parse error:', err);
-        document.getElementById('status').textContent = `Error loading CSV: ${err.message}`;
+        console.error('Fetch or parse error:', err);
+        document.getElementById('status').textContent = 'Error: ' + err.message;
       });
 
-    // 2) Create a Chart.js line with the loaded data
     function createTimeSeries(allRows) {
-      // If we want to filter for a specific region, do so here:
-      const selectedRegion = 1;  // or whichever region ID you want to see
-      const filtered = allRows.filter(d => d.department === selectedRegion);
-
-      console.log(`Filtering for department=${selectedRegion}, found rows:`, filtered);
+      // 4) Filter for a region. If your CSV has "department=1" rows, do:
+      const selectedRegion = 1; // or pick any region you know should exist
+      const filtered = allRows.filter(row => row.department === selectedRegion);
+      console.log(`Filtering for department=${selectedRegion}, found ${filtered.length} rows.`, filtered);
 
       let labels, values;
       if (filtered.length > 0) {
-        // We have real data for the region
-        labels = filtered.map(row => row.year);
-        values = filtered.map(row => row.y_HH);
-        document.getElementById('status').textContent = `Loaded ${filtered.length} rows for region ${selectedRegion}`;
+        labels = filtered.map(r => r.year);
+        values = filtered.map(r => r.y_HH);
+        document.getElementById('status').textContent += ` Showing region ${selectedRegion} with ${filtered.length} rows.`;
       } else {
-        // Fallback if empty or mismatch
-        console.warn('No matching rows! Using fallback data.');
-        document.getElementById('status').textContent = 'No matching CSV data found. Showing fallback sample.';
+        // fallback demo
+        console.warn('No matching data found, using fallback sample data.');
+        document.getElementById('status').textContent += ' No matching data, using fallback.';
         labels = [1997, 1998, 1999, 2000];
         values = [50, 100, 150, 200];
       }
@@ -91,23 +75,17 @@
         data: {
           labels: labels,
           datasets: [{
-            label: 'Ingresos (Demo)',
+            label: 'Ingresos del Hogar Mensuales p/c (PEN)',
             data: values,
             borderColor: '#4e79a7',
             backgroundColor: '#4e79a7',
             pointRadius: 4,
-            pointHoverRadius: 6
+            pointHoverRadius: 7
           }]
         },
         options: {
           responsive: true,
           interaction: { intersect: false, mode: 'index' },
-          plugins: {
-            title: {
-              display: true,
-              text: 'Ingresos del Hogar Mensuales p/c (PEN)'
-            }
-          },
           scales: {
             x: { display: true },
             y: { display: true }
