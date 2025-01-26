@@ -42,6 +42,15 @@
 <body>
   <!-- Region Dropdown -->
   <select id="regionSelect"></select>
+  <!-- Outcome Dropdown -->
+  <select id="outcomeSelect">
+    <option value="y_HH">Household Income (y_HH)</option>
+    <option value="age">Age</option>
+    <option value="educ">Education</option>
+    <option value="formal">Formal Employment</option>
+    <option value="self_employed">Self-Employed</option>
+    <option value="poor">Poverty</option>
+  </select>
 
   <div class="container">
     <!-- Leaflet Map (no base tiles, just GeoJSON) -->
@@ -91,12 +100,12 @@
     function createVisualization(data) {
       // 3) Build region dropdown from unique numeric department IDs
       const regionIds = [...new Set(data.map(d => d.department))];
-      const select = document.getElementById('regionSelect');
+      const regionSelect = document.getElementById('regionSelect');
       regionIds.forEach(region => {
         const option = document.createElement('option');
         option.value = region;
         option.text = `Region ${region}`;
-        select.appendChild(option);
+        regionSelect.appendChild(option);
       });
 
       // 4) Initialize Chart.js
@@ -114,7 +123,7 @@
           plugins: {
             title: {
               display: true,
-              text: 'Ingresos del Hogar Mensuales p/c (PEN)'
+              text: 'Peru Region Data'
             }
           },
           scales: {
@@ -128,21 +137,27 @@
         }
       });
 
-      // Update chart & highlight map when dropdown changes
-      select.onchange = e => updateAll(Number(e.target.value));
-      // Initialize with the first region
-      updateAll(regionIds[0]);
+      // Update chart & highlight map when dropdowns change
+      const outcomeSelect = document.getElementById('outcomeSelect');
+      regionSelect.onchange = () => updateAll();
+      outcomeSelect.onchange = () => updateAll();
 
-      // Called whenever region changes
-      function updateAll(selectedRegion) {
-        // Filter CSV by that region
+      // Initialize with the first region and first outcome
+      updateAll();
+
+      // Called whenever region or outcome changes
+      function updateAll() {
+        const selectedRegion = Number(regionSelect.value);
+        const selectedOutcome = outcomeSelect.value;
+
+        // Filter CSV by the selected region
         const filtered = data.filter(d => d.department === selectedRegion);
 
         // Update chart data
         chart.data.labels = filtered.map(d => d.year.toString()); // Ensure labels are strings
         chart.data.datasets = [{
-          label: `Region ${selectedRegion}`,
-          data: filtered.map(d => d.y_HH),
+          label: `Region ${selectedRegion} - ${selectedOutcome}`,
+          data: filtered.map(d => d[selectedOutcome]),
           borderColor: '#4e79a7',
           backgroundColor: '#4e79a7',
           pointRadius: 3,
