@@ -135,5 +135,34 @@
            updateVisuals(regions[0]);
        }
    </script>
+   <script>
+    let map = L.map('map').setView([-9.189967, -75.015152], 5);
+    
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    Promise.all([
+        fetch('input.csv')
+            .then(r => r.text())
+            .catch(e => {
+                console.error('CSV error:', e);
+                return null;
+            }),
+        fetch('peru_regions.geojson')
+            .then(r => r.json())
+            .catch(e => {
+                console.error('GeoJSON error:', e);
+                return null;
+            })
+    ]).then(([csvText, geojson]) => {
+        if (!csvText || !geojson) {
+            console.error('Failed to load data');
+            return;
+        }
+        // Rest of your visualization code
+    });
+</script>
 </body>
 </html>
