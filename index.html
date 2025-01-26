@@ -42,16 +42,7 @@
 <body>
   <!-- Region Dropdown -->
   <select id="regionSelect"></select>
-  <!-- Outcome Dropdown -->
-  <select id="outcomeSelect">
-    <option value="y_HH">Household Income (y_HH)</option>
-    <option value="age">Age</option>
-    <option value="educ">Education</option>
-    <option value="formal">Formal Employment</option>
-    <option value="self_employed">Self-Employed</option>
-    <option value="poor">Poverty</option>
-  </select>
-
+  
   <div class="container">
     <!-- Leaflet Map (no base tiles, just GeoJSON) -->
     <div id="map"></div>
@@ -62,9 +53,9 @@
   </div>
 
   <script>
-    let chart;         // Chart.js instance
-    let geojsonLayer;  // Leaflet GeoJSON layer
-    let selectedRegionId = null; // Track the currently selected region
+    let chart;                // Chart.js instance
+    let geojsonLayer;         // Leaflet GeoJSON layer
+    let selectedRegionGlobal; // store the currently selected region ID
 
     // 1) Initialize Leaflet map with normal panning/zooming
     let map = L.map('map').setView([-9.189967, -75.015152], 5);
@@ -80,45 +71,40 @@
         dynamicTyping: true
       }).data;
 
-      console.log(data); // Debug: Inspect parsed data
+      console.log('Parsed CSV data:', data); // debug
 
-      // Create a GeoJSON layer
+      // Create the GeoJSON layer with default style
       geojsonLayer = L.geoJSON(geojsonData, {
         style: {
-          fillColor: '#ccc', // Default fill color
-          color: '#999',     // Default border color
-          weight: 1          // Default border weight
+          fillColor: '#ccc',
+          color: '#999',
+          weight: 1
         },
         onEachFeature: (feature, layer) => {
-          // Add hover effects
+          // Add ephemeral hover highlight for non-selected regions
           layer.on({
             mouseover: () => {
-              if (feature.properties.region_id !== selectedRegionId) {
+              if (feature.properties.region_id !== selectedRegionGlobal) {
                 layer.setStyle({
-                  fillColor: '#4e79a7', // Highlight color
-                  color: '#333',        // Highlight border color
-                  weight: 2             // Highlight border weight
+                  fillColor: '#4e79a7',
+                  color: '#333',
+                  weight: 2
                 });
               }
             },
             mouseout: () => {
-              if (feature.properties.region_id !== selectedRegionId) {
-                // Reset to default style if not the selected region
-                layer.setStyle({
-                  fillColor: '#ccc',
-                  color: '#999',
-                  weight: 1
-                });
+              if (feature.properties.region_id !== selectedRegionGlobal) {
+                geojsonLayer.resetStyle(layer);
               }
             }
           });
         }
       }).addTo(map);
 
-      // Fit map to the bounds of the GeoJSON shapes
+      // Fit map to the bounds of the GeoJSON
       map.fitBounds(geojsonLayer.getBounds());
 
-      // Build chart & dropdown logic
+      // Now create chart & dropdown logic
       createVisualization(data);
     });
 
@@ -141,48 +127,40 @@
         options: {
           animation: false,
           responsive: true,
-          interaction: {
-            intersect: false,
-            mode: 'index'
-          },
+          interaction: { intersect: false, mode: 'index' },
           plugins: {
             title: {
               display: true,
-              text: 'Peru Region Data'
+              text: 'Ingresos del Hogar Mensuales p/c (PEN)'
             }
           },
           scales: {
-            x: {
-              display: true
-            },
-            y: {
-              display: true
-            }
+            x: { display: true },
+            y: { display: true }
           }
         }
       });
 
-      // Update chart & highlight map when dropdowns change
-      const outcomeSelect = document.getElementById('outcomeSelect');
-      regionSelect.onchange = () => updateAll();
-      outcomeSelect.onchange = () => updateAll();
+      // On dropdown change, update chart + map highlight
+      regionSelect.onchange = updateAll;
 
-      // Initialize with the first region and first outcome
+      // Initialize with the first region
+      regionSelect.value = regionIds[0];
       updateAll();
 
-      // Called whenever region or outcome changes
       function updateAll() {
         const selectedRegion = Number(regionSelect.value);
-        const selectedOutcome = outcomeSelect.value;
+        selectedRegionGlobal = selectedRegion; // store globally so hover logic can compare
 
-        // Filter CSV by the selected region
+        // Filter CSV for the chosen region
         const filtered = data.filter(d => d.department === selectedRegion);
+        console.log(`Filtering for region=${selectedRegion}, rows:`, filtered);
 
         // Update chart data
-        chart.data.labels = filtered.map(d => d.year.toString()); // Ensure labels are strings
+        chart.data.labels = filtered.map(d => d.year);
         chart.data.datasets = [{
-          label: `Region ${selectedRegion} - ${selectedOutcome}`,
-          data: filtered.map(d => d[selectedOutcome]),
+          label: `Region ${selectedRegion}`,
+          data: filtered.map(d => d.y_HH),
           borderColor: '#4e79a7',
           backgroundColor: '#4e79a7',
           pointRadius: 3,
@@ -190,22 +168,17 @@
         }];
         chart.update('none');
 
-        // Highlight the selected region on the map
-        selectedRegionId = selectedRegion; // Update the selected region ID
+        // Permanently highlight that region on the map, reset others
         geojsonLayer.eachLayer(layer => {
-          if (layer.feature.properties.region_id === selectedRegionId) {
+          const rid = layer.feature.properties.region_id;
+          if (rid === selectedRegion) {
             layer.setStyle({
-              fillColor: '#4e79a7', // Highlight color
-              color: '#333',        // Highlight border color
-              weight: 2             // Highlight border weight
+              fillColor: '#4e79a7',
+              color: '#333',
+              weight: 2
             });
           } else {
-            // Reset other regions to default style
-            layer.setStyle({
-              fillColor: '#ccc',
-              color: '#999',
-              weight: 1
-            });
+            geojsonLayer.resetStyle(layer);
           }
         });
       }
