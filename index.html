@@ -12,13 +12,45 @@
 
   <style>
     body {
-      background: #f5f5f5; 
-      margin: 0; 
-      padding: 20px; 
+      background: #f5f5f5;
+      margin: 0;
+      padding: 20px;
       font-family: sans-serif;
     }
+    /* Tab Styles */
+    .tab-container {
+      overflow: hidden;
+      border-bottom: 1px solid #ccc;
+      margin-bottom: 20px;
+    }
+    .tab-button {
+      background: #e0e0e0;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 10px 20px;
+      float: left;
+      transition: background 0.3s;
+    }
+    .tab-button:hover {
+      background: #d0d0d0;
+    }
+    .tab-button.active {
+      background: #fff;
+      border-bottom: 2px solid #4e79a7;
+    }
+    .tab-content {
+      display: none;
+      padding: 20px;
+      background: #fff;
+      border-radius: 4px;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    /* Dashboard Specific Styles */
     select {
-      margin-bottom: 10px; 
+      margin-bottom: 10px;
       padding: 5px;
     }
     .container {
@@ -28,7 +60,7 @@
     #map {
       width: 40%;
       height: 500px;
-      background: #fff; /* blank background for no base tiles */
+      background: #fff;
       border-radius: 4px;
     }
     #chartContainer {
@@ -37,84 +69,132 @@
       border-radius: 4px;
       padding: 20px;
     }
+    /* Inventory Specific Styles */
+    .inventory-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .inventory-table th, .inventory-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .inventory-table th {
+      background: #4e79a7;
+      color: white;
+    }
+    .inventory-table tr:nth-child(even) {
+      background: #f9f9f9;
+    }
   </style>
 </head>
 <body>
-  <!-- Region Dropdown -->
-  <select id="regionSelect"></select>
-  <!-- Outcome Dropdown -->
-  <select id="outcomeSelect">
-    <option value="y_HH">Household Income (y_HH)</option>
-    <option value="age">Age</option>
-    <option value="educ">Education</option>
-    <option value="formal">Formal Employment</option>
-    <option value="self_employed">Self-Employed</option>
-    <option value="poor">Poverty</option>
-  </select>
+  <!-- Tab Navigation -->
+  <div class="tab-container">
+    <button class="tab-button active" onclick="openTab('dashboard')">Dashboard</button>
+    <button class="tab-button" onclick="openTab('inventory')">Inventory</button>
+  </div>
 
-  <div class="container">
-    <!-- Leaflet Map (no base tiles, just GeoJSON) -->
-    <div id="map"></div>
-    <!-- Chart.js Container -->
-    <div id="chartContainer">
-      <canvas id="chart"></canvas>
+  <!-- Dashboard Tab (Existing Content) -->
+  <div id="dashboard" class="tab-content active">
+    <select id="regionSelect"></select>
+    <select id="outcomeSelect">
+      <option value="y_HH">Household Income (y_HH)</option>
+      <option value="age">Age</option>
+      <option value="educ">Education</option>
+      <option value="formal">Formal Employment</option>
+      <option value="self_employed">Self-Employed</option>
+      <option value="poor">Poverty</option>
+    </select>
+    <div class="container">
+      <div id="map"></div>
+      <div id="chartContainer">
+        <canvas id="chart"></canvas>
+      </div>
     </div>
+  </div>
+
+  <!-- Inventory Tab -->
+  <div id="inventory" class="tab-content">
+    <h2>Dataset Inventory</h2>
+    <p>Below is a list of datasets used in this dashboard:</p>
+    <table class="inventory-table">
+      <thead>
+        <tr>
+          <th>Dataset Name</th>
+          <th>Description</th>
+          <th>Source</th>
+          <th>Last Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>input.csv</td>
+          <td>Socioeconomic data for Peruvian regions, including income, age, education, etc.</td>
+          <td>[Your Data Source]</td>
+          <td>Feb 23, 2025</td>
+        </tr>
+        <tr>
+          <td>peru_regions.geojson</td>
+          <td>Geographical boundaries of Peruvian regions</td>
+          <td>[Your GeoJSON Source]</td>
+          <td>Feb 23, 2025</td>
+        </tr>
+        <!-- Add more rows as needed -->
+      </tbody>
+    </table>
   </div>
 
   <script>
     let chart;         // Chart.js instance
     let geojsonLayer;  // Leaflet GeoJSON layer
 
-    // 1) Initialize Leaflet map with normal panning/zooming
+    // Tab Switching Function
+    function openTab(tabName) {
+      const tabs = document.getElementsByClassName('tab-content');
+      const buttons = document.getElementsByClassName('tab-button');
+      for (let i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
+        buttons[i].classList.remove('active');
+      }
+      document.getElementById(tabName).classList.add('active');
+      document.querySelector(`button[onclick="openTab('${tabName}')"]`).classList.add('active');
+    }
+
+    // Initialize Leaflet map
     let map = L.map('map').setView([-9.189967, -75.015152], 5);
 
-    // 2) Load CSV (input.csv) & GeoJSON (peru_regions.geojson)
+    // Load CSV & GeoJSON
     Promise.all([
       fetch('input.csv').then(r => r.text()),
       fetch('peru_regions.geojson').then(r => r.json())
     ]).then(([csvText, geojsonData]) => {
-      // Parse CSV with Papa
-      const data = Papa.parse(csvText, {
-        header: true,
-        dynamicTyping: true
-      }).data;
+      const data = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
+      console.log(data);
 
-      console.log(data); // Debug: Inspect parsed data
-
-      // Create a GeoJSON layer
       geojsonLayer = L.geoJSON(geojsonData, {
         style: {
-          fillColor: '#ccc', // Default fill color
-          color: '#999',     // Default border color
-          weight: 1          // Default border weight
+          fillColor: '#ccc',
+          color: '#999',
+          weight: 1
         },
         onEachFeature: (feature, layer) => {
-          // Add hover effects
           layer.on({
             mouseover: () => {
-              layer.setStyle({
-                fillColor: '#4e79a7', // Highlight color
-                color: '#333',        // Highlight border color
-                weight: 2             // Highlight border weight
-              });
+              layer.setStyle({ fillColor: '#4e79a7', color: '#333', weight: 2 });
             },
             mouseout: () => {
-              // Reset to default style
               geojsonLayer.resetStyle(layer);
             }
           });
         }
       }).addTo(map);
 
-      // Fit map to the bounds of the GeoJSON shapes
       map.fitBounds(geojsonLayer.getBounds());
-
-      // Build chart & dropdown logic
       createVisualization(data);
     });
 
     function createVisualization(data) {
-      // 3) Build region dropdown from unique numeric department IDs
       const regionIds = [...new Set(data.map(d => d.department))];
       const regionSelect = document.getElementById('regionSelect');
       regionIds.forEach(region => {
@@ -124,7 +204,6 @@
         regionSelect.appendChild(option);
       });
 
-      // 4) Initialize Chart.js
       const ctx = document.getElementById('chart').getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
@@ -132,45 +211,23 @@
         options: {
           animation: false,
           responsive: true,
-          interaction: {
-            intersect: false,
-            mode: 'index'
-          },
-          plugins: {
-            title: {
-              display: true,
-              text: 'Peru Region Data'
-            }
-          },
-          scales: {
-            x: {
-              display: true
-            },
-            y: {
-              display: true
-            }
-          }
+          interaction: { intersect: false, mode: 'index' },
+          plugins: { title: { display: true, text: 'Peru Region Data' } },
+          scales: { x: { display: true }, y: { display: true } }
         }
       });
 
-      // Update chart & highlight map when dropdowns change
       const outcomeSelect = document.getElementById('outcomeSelect');
       regionSelect.onchange = () => updateAll();
       outcomeSelect.onchange = () => updateAll();
-
-      // Initialize with the first region and first outcome
       updateAll();
 
-      // Called whenever region or outcome changes
       function updateAll() {
         const selectedRegion = Number(regionSelect.value);
         const selectedOutcome = outcomeSelect.value;
-
-        // Filter CSV by the selected region
         const filtered = data.filter(d => d.department === selectedRegion);
 
-        // Update chart data
-        chart.data.labels = filtered.map(d => d.year.toString()); // Ensure labels are strings
+        chart.data.labels = filtered.map(d => d.year.toString());
         chart.data.datasets = [{
           label: `Region ${selectedRegion} - ${selectedOutcome}`,
           data: filtered.map(d => d[selectedOutcome]),
@@ -181,16 +238,10 @@
         }];
         chart.update('none');
 
-        // Highlight the selected region on the map
         geojsonLayer.eachLayer(layer => {
           if (layer.feature.properties.region_id === selectedRegion) {
-            layer.setStyle({
-              fillColor: '#4e79a7', // Highlight color
-              color: '#333',        // Highlight border color
-              weight: 2             // Highlight border weight
-            });
+            layer.setStyle({ fillColor: '#4e79a7', color: '#333', weight: 2 });
           } else {
-            // Reset other regions to default style
             geojsonLayer.resetStyle(layer);
           }
         });
