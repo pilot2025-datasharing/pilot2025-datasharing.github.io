@@ -1,0 +1,4 @@
+name,description,source,last_updated
+input.csv,"Socioeconomic data for Peruvian regions","National Statistics Office","Feb 23, 2025"
+peru_regions.geojson,"Geographical boundaries","OpenStreetMap","Feb 23, 2025"
+new_data.csv,"Additional metrics","Research Institute","Jan 15, 2025"
