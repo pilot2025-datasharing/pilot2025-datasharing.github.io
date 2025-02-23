@@ -17,7 +17,6 @@
       padding: 20px;
       font-family: sans-serif;
     }
-    /* Tab Styles */
     .tab-container {
       overflow: hidden;
       border-bottom: 1px solid #ccc;
@@ -48,7 +47,6 @@
     .tab-content.active {
       display: block;
     }
-    /* Dashboard Specific Styles */
     select {
       margin-bottom: 10px;
       padding: 5px;
@@ -69,10 +67,17 @@
       border-radius: 4px;
       padding: 20px;
     }
-    /* Inventory Specific Styles */
+    .inventory-section {
+      margin-bottom: 30px;
+    }
+    .inventory-section h3 {
+      color: #4e79a7;
+      margin-bottom: 10px;
+    }
     .inventory-table {
       width: 100%;
       border-collapse: collapse;
+      margin-bottom: 20px;
     }
     .inventory-table th, .inventory-table td {
       border: 1px solid #ddd;
@@ -89,13 +94,11 @@
   </style>
 </head>
 <body>
-  <!-- Tab Navigation -->
   <div class="tab-container">
     <button class="tab-button active" onclick="openTab(event, 'dashboard')">Dashboard</button>
     <button class="tab-button" onclick="openTab(event, 'inventory')">Inventory</button>
   </div>
 
-  <!-- Dashboard Tab -->
   <div id="dashboard" class="tab-content active">
     <select id="regionSelect"></select>
     <select id="outcomeSelect">
@@ -114,52 +117,22 @@
     </div>
   </div>
 
-  <!-- Inventory Tab -->
   <div id="inventory" class="tab-content">
     <h2>Dataset Inventory</h2>
-    <p>Below is a list of datasets used in this dashboard:</p>
-    <table class="inventory-table">
-      <thead>
-        <tr>
-          <th>Dataset Name</th>
-          <th>Description</th>
-          <th>Source</th>
-          <th>Last Updated</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>input.csv</td>
-          <td>Socioeconomic data for Peruvian regions</td>
-          <td>[Your Data Source]</td>
-          <td>Feb 23, 2025</td>
-        </tr>
-        <tr>
-          <td>peru_regions.geojson</td>
-          <td>Geographical boundaries of Peruvian regions</td>
-          <td>[Your GeoJSON Source]</td>
-          <td>Feb 23, 2025</td>
-        </tr>
-      </tbody>
-    </table>
+    <p>Below is a list of datasets used in this dashboard, organized by sections:</p>
+    <div id="inventorySections"></div>
   </div>
 
   <script>
-    // Tab Switching Function
     function openTab(evt, tabName) {
-      // Hide all tab content
       const tabContents = document.getElementsByClassName("tab-content");
       for (let i = 0; i < tabContents.length; i++) {
         tabContents[i].classList.remove("active");
       }
-
-      // Remove active class from all buttons
       const tabButtons = document.getElementsByClassName("tab-button");
       for (let i = 0; i < tabButtons.length; i++) {
         tabButtons[i].classList.remove("active");
       }
-
-      // Show the selected tab and mark its button as active
       document.getElementById(tabName).classList.add("active");
       evt.currentTarget.classList.add("active");
     }
@@ -171,10 +144,16 @@
 
     Promise.all([
       fetch('input.csv').then(r => r.text()),
-      fetch('peru_regions.geojson').then(r => r.json())
-    ]).then(([csvText, geojsonData]) => {
+      fetch('peru_regions.geojson').then(r => r.json()),
+      fetch('inventory.csv').then(r => r.text())
+    ]).then(([csvText, geojsonData, inventoryText]) => {
       const data = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
-      console.log(data);
+      console.log("Dashboard Data:", data);
+
+      const inventoryData = Papa.parse(inventoryText, { header: true, dynamicTyping: true }).data;
+      console.log("Inventory Data:", inventoryData);
+
+      populateInventorySections(inventoryData);
 
       geojsonLayer = L.geoJSON(geojsonData, {
         style: { fillColor: '#ccc', color: '#999', weight: 1 },
@@ -188,7 +167,60 @@
 
       map.fitBounds(geojsonLayer.getBounds());
       createVisualization(data);
-    });
+    }).catch(error => console.error("Error loading files:", error));
+
+    function populateInventorySections(inventoryData) {
+      const sectionsContainer = document.getElementById('inventorySections');
+      sectionsContainer.innerHTML = ''; // Clear existing content
+
+      // Group data by section
+      const sections = {};
+      inventoryData.forEach(item => {
+        if (!sections[item.section]) {
+          sections[item.section] = [];
+        }
+        sections[item.section].push(item);
+      });
+
+      // Create a section for each group
+      Object.keys(sections).forEach(sectionName => {
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'inventory-section';
+
+        const sectionTitle = document.createElement('h3');
+        sectionTitle.textContent = sectionName;
+        sectionDiv.appendChild(sectionTitle);
+
+        const table = document.createElement('table');
+        table.className = 'inventory-table';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Dataset Name</th>
+              <th>Description</th>
+              <th>Source</th>
+              <th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+
+        const tbody = table.querySelector('tbody');
+        sections[sectionName].forEach(item => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${item.name || ''}</td>
+            <td>${item.description || ''}</td>
+            <td>${item.source || ''}</td>
+            <td>${item.last_updated || ''}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        sectionDiv.appendChild(table);
+        sectionsContainer.appendChild(sectionDiv);
+      });
+    }
 
     function createVisualization(data) {
       const regionIds = [...new Set(data.map(d => d.department))];
