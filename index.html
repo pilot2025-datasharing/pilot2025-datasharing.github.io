@@ -143,17 +143,18 @@
     let map = L.map('map').setView([-9.189967, -75.015152], 5);
 
     Promise.all([
-      fetch('input.csv').then(r => r.text()),
-      fetch('peru_regions.geojson').then(r => r.json()),
-      fetch('inventory.csv').then(r => r.text())
-    ]).then(([csvText, geojsonData, inventoryText]) => {
+      fetch('input.csv').then(r => r.text()), // For dashboard
+      fetch('peru_regions.geojson').then(r => r.json()), // For dashboard
+      fetch('index.csv').then(r => r.text()) // For inventory tab ONLY
+    ]).then(([csvText, geojsonData, indexText]) => {
       const data = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
-      console.log("Dashboard Data:", data);
+      console.log("Dashboard Data from input.csv:", data);
 
-      const inventoryData = Papa.parse(inventoryText, { header: true, dynamicTyping: true }).data;
-      console.log("Inventory Data:", inventoryData);
+      console.log("Raw index.csv text:", indexText); // Debug raw text
+      const indexData = Papa.parse(indexText, { header: true, dynamicTyping: true }).data;
+      console.log("Parsed indexData:", indexData); // Debug parsed data
 
-      populateInventorySections(inventoryData);
+      populateInventorySections(indexData); // Use index.csv data only
 
       geojsonLayer = L.geoJSON(geojsonData, {
         style: { fillColor: '#ccc', color: '#999', weight: 1 },
@@ -169,13 +170,13 @@
       createVisualization(data);
     }).catch(error => console.error("Error loading files:", error));
 
-    function populateInventorySections(inventoryData) {
+    function populateInventorySections(indexData) {
       const sectionsContainer = document.getElementById('inventorySections');
       sectionsContainer.innerHTML = ''; // Clear existing content
 
-      // Group data by section
+      // Group data by section (assuming index.csv has a 'section' column)
       const sections = {};
-      inventoryData.forEach(item => {
+      indexData.forEach(item => {
         if (!sections[item.section]) {
           sections[item.section] = [];
         }
